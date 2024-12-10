@@ -5,7 +5,11 @@
 
     <!-- flutter_nfc_hce permission add begin -->
     <uses-permission android:name="android.permission.NFC" />
+    <!-- API 9 设备可以使用近场通信（NFC）进行通信。 -->
     <uses-feature android:name="android.hardware.nfc" android:required="true" />
+    <!-- API 19 该设备支持基于主机的NFC卡仿真。 -->
+    <uses-feature android:name="android.hardware.nfc.hcef" android:required="true" />
+    <!-- API 24 该设备支持基于主机的NFC-F卡仿真。 -->
     <uses-feature android:name="android.hardware.nfc.hce" android:required="true" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- flutter_nfc_hce permission add end -->

@@ -16,10 +16,10 @@ class MethodChannelFlutterNfcHce extends FlutterNfcHcePlatform {
 
   @override
   Future<String?> startNfcHce(
-      String content,
-      String mimeType,
-      bool persistMessage,
-      ) async {
+    String content,
+    String mimeType,
+    bool persistMessage,
+  ) async {
     return await methodChannel.invokeMethod<String>(
       'startNfcHce',
       <String, dynamic>{

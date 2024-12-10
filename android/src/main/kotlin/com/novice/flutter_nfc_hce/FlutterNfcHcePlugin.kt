@@ -1,15 +1,20 @@
 package com.novice.flutter_nfc_hce
 
+import android.annotation.TargetApi
 import android.app.Activity
+import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.nfc.NfcAdapter
+import android.nfc.cardemulation.CardEmulation
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
+import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
-import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
@@ -20,6 +25,7 @@ class FlutterNfcHcePlugin: FlutterPlugin, MethodCallHandler, ActivityAware  {
     // add code
     private var mNfcAdapter: NfcAdapter? = null
     private var activity: Activity? = null
+    private var pendingIntent: PendingIntent? = null
     private lateinit var channel : MethodChannel
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -121,7 +127,11 @@ class FlutterNfcHcePlugin: FlutterPlugin, MethodCallHandler, ActivityAware  {
         return mNfcAdapter?.isSecureNfcEnabled == true
     }
 
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     private fun initService(content: String, mimeType: String, persistMessage: Boolean) {
+        /*val cardEmulation = CardEmulation.getInstance(mNfcAdapter)
+        val componentName = ComponentName(activity!!, KHostApduService::class.java)
+        cardEmulation.setPreferredService(activity, componentName)*/
         val intent = Intent(activity, KHostApduService::class.java)
         intent.putExtra("content", content)
         intent.putExtra("mimeType", mimeType)

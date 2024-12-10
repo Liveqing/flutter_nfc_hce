@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.nfc.NdefMessage
 import android.nfc.NdefRecord
 import android.nfc.cardemulation.HostApduService
@@ -11,6 +12,7 @@ import android.os.Bundle
 import android.util.Log
 import java.io.*
 import java.math.BigInteger
+
 
 class KHostApduService : HostApduService() {
 
@@ -107,28 +109,44 @@ class KHostApduService : HostApduService() {
     //2023.09.16
     //Read an Ndef message from a file and initialize it as a variable
     //If the file does not exist, assign the default value 'Hello world.'
-    private var NDEF_URI = NdefMessage(readNdefMessageFromFile(this)?.let {
-        createNdefRecord(
-            it, "text/plain", NDEF_ID)
-    })
+    private var NDEF_URI: NdefMessage? = null/* = NdefMessage(readNdefMessageFromFile(this)?.let {
+            createUriRecord(it, NDEF_ID)
+    })*/
 
-    private var NDEF_URI_BYTES = NDEF_URI.toByteArray()
-    private var NDEF_URI_LEN = fillByteArrayToFixedDimension(
+    private var NDEF_URI_BYTES = byteArrayOf()/*NDEF_URI.toByteArray()*/
+    private var NDEF_URI_LEN = byteArrayOf()/*fillByteArrayToFixedDimension(
         BigInteger.valueOf(NDEF_URI_BYTES.size.toLong()).toByteArray(),
         2,
-    )
+    )*/
 
-    private var NDEF_MESSAGE: String? = readNdefMessageFromFile(this)
+    private var NDEF_MESSAGE: String? = ""/*readNdefMessageFromFile(this)*/
 
     override fun onCreate() {
         super.onCreate()
         Log.i("onCreate()", "-> ndefMessage initial value: $NDEF_MESSAGE")
+        loadSpData()
+    }
+
+    private fun loadSpData(){
+        val content = readNdefMessageFromFile(this)
+        Log.i("loadSpData()", "-> content: $content")
+        if (!content.isNullOrEmpty()) {
+            NDEF_URI = NdefMessage(createUriRecord(content, NDEF_ID))
+            NDEF_URI?.let {
+                NDEF_URI_BYTES = it.toByteArray()
+                NDEF_URI_LEN = fillByteArrayToFixedDimension(
+                    BigInteger.valueOf(NDEF_URI_BYTES.size.toLong()).toByteArray(),
+                    2,
+                )
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.hasExtra("content")!!
             && intent.hasExtra("mimeType")
-            && intent.hasExtra("persistMessage")) {
+            && intent.hasExtra("persistMessage")
+        ) {
 
             val content = intent.getStringExtra("content")!!
             val mimeType = intent.getStringExtra("mimeType")!!
@@ -141,18 +159,22 @@ class KHostApduService : HostApduService() {
 //                Log.i("onStartCommand()", "readNdefMessageFromFile() != ndefMessage ->ndefMessage: " + content +", file message: " + readNdefMessageFromFile(this))
 //            }
 
-           if(persistMessage){
-                Log.i("onStartCommand()", "persistMessage == true -> writeNdefMessageToFile call, content: " + content)
+            if (persistMessage) {
+                Log.i(
+                    "onStartCommand()",
+                    "persistMessage == true -> writeNdefMessageToFile call, content: $content"
+                )
                 writeNdefMessageToFile(this, content)
-           }
+            }
 
             NDEF_URI = NdefMessage(createNdefRecord(content, mimeType, NDEF_ID))
-
-            NDEF_URI_BYTES = NDEF_URI.toByteArray()
-            NDEF_URI_LEN = fillByteArrayToFixedDimension(
-                BigInteger.valueOf(NDEF_URI_BYTES.size.toLong()).toByteArray(),
-                2,
-            )
+            NDEF_URI?.let {
+                NDEF_URI_BYTES = it.toByteArray()
+                NDEF_URI_LEN = fillByteArrayToFixedDimension(
+                    BigInteger.valueOf(NDEF_URI_BYTES.size.toLong()).toByteArray(),
+                    2,
+                )
+            }
         }
 
         Log.i(TAG, "onStartCommand() | NDEF$NDEF_URI")
@@ -207,6 +229,12 @@ class KHostApduService : HostApduService() {
 
         if (NDEF_READ_BINARY_NLEN.contentEquals(commandApdu)) {
             // Build our response
+            if(NDEF_URI_LEN.isEmpty()){
+                loadSpData()
+                if(NDEF_URI_LEN.isEmpty()){
+                    return A_OKAY
+                }
+            }
             val response = ByteArray(NDEF_URI_LEN.size + A_OKAY.size)
             System.arraycopy(NDEF_URI_LEN, 0, response, 0, NDEF_URI_LEN.size)
             System.arraycopy(A_OKAY, 0, response, NDEF_URI_LEN.size, A_OKAY.size)
@@ -218,6 +246,12 @@ class KHostApduService : HostApduService() {
         }
 
         if (commandApdu.sliceArray(0..1).contentEquals(NDEF_READ_BINARY)) {
+            if(NDEF_URI_LEN.isEmpty()){
+                loadSpData()
+                if(NDEF_URI_LEN.isEmpty()){
+                    return A_OKAY
+                }
+            }
             val offset = commandApdu.sliceArray(2..3).toHex().toInt(16)
             val length = commandApdu.sliceArray(4..4).toHex().toInt(16)
 
@@ -295,8 +329,11 @@ class KHostApduService : HostApduService() {
     private fun createNdefRecord(content: String, mimeType: String, id: ByteArray): NdefRecord {
         Log.i(TAG, "createNdefRecord(): $content")
 
-        if(mimeType == "text/plain") {
+        if (mimeType == "text/plain") {
             return createTextRecord("en", content, id);
+        }
+        if (mimeType == "text/uri") {
+            return createUriRecord(content, id);
         }
 
         val type = mimeType.toByteArray(charset("US-ASCII"))
@@ -330,6 +367,25 @@ class KHostApduService : HostApduService() {
         return NdefRecord(NdefRecord.TNF_WELL_KNOWN, NdefRecord.RTD_TEXT, id, recordPayload)
     }
 
+    private fun createUriRecord(uri: String, id: ByteArray): NdefRecord {
+        val uriBytes: ByteArray = try {
+            uri.toByteArray(Charsets.UTF_8)
+        } catch (e: UnsupportedEncodingException) {
+            throw AssertionError(e)
+        }
+
+        // 前缀码：通常用于压缩常见的 URI 前缀，例如 http://、https:// 等
+        val prefixCode: Byte = 0x00 // 不使用任何前缀压缩
+
+        val recordPayload = ByteArray(1 + uriBytes.size)
+
+        recordPayload[0] = prefixCode // 前缀码
+        System.arraycopy(uriBytes, 0, recordPayload, 1, uriBytes.size)
+
+        return NdefRecord(NdefRecord.TNF_WELL_KNOWN, NdefRecord.RTD_URI, id, recordPayload)
+    }
+
+
     private fun fillByteArrayToFixedDimension(array: ByteArray, fixedSize: Int): ByteArray {
         if (array.size == fixedSize) {
             return array
@@ -343,20 +399,24 @@ class KHostApduService : HostApduService() {
     }
 
     override fun onDestroy() {
-        deleteNdefMessageFile(this)
+        //deleteNdefMessageFile(applicationContext)
         super.onDestroy()
     }
 
     //2023.09.16 modify
     companion object {
-        private val READ_BLOCK_SIZE: Int = 100
+        //private val READ_BLOCK_SIZE: Int = 100
         @SuppressLint("LongLogTag")
         @JvmStatic
         fun readNdefMessageFromFile(context: Context): String? {
-            var ndefMessage: String? = "Hello world"
+            var ndefMessage: String? = ""
 
             try {
-                val fileIn: FileInputStream = context.openFileInput("NdefMessage.txt")
+                val sp1: SharedPreferences =
+                    context.getSharedPreferences("HceNdefMessage", MODE_PRIVATE)
+                ndefMessage = sp1.getString("content", "")
+                Log.i("SharedPreferences", "Read a message '$ndefMessage' from NdefMessage")
+                /*val fileIn: FileInputStream = context.openFileInput("NdefMessage.txt")
                 val InputRead = InputStreamReader(fileIn)
                 val inputBuffer = CharArray(READ_BLOCK_SIZE)
                 var charRead: Int
@@ -367,7 +427,7 @@ class KHostApduService : HostApduService() {
                 }
                 InputRead.close()
 
-                Log.i("readNdefMessageFromFile()", "Read a message '"+ ndefMessage +"' from NdefMessage.txt.")
+                Log.i("readNdefMessageFromFile()", "Read a message '"+ ndefMessage +"' from NdefMessage.txt.")*/
             } catch (e: java.lang.Exception) {
                 e.printStackTrace()
             }
@@ -379,12 +439,16 @@ class KHostApduService : HostApduService() {
         @JvmStatic
         fun writeNdefMessageToFile(context: Context, ndefMessage: String) {
             try {
-                val fileout: FileOutputStream = context.openFileOutput("NdefMessage.txt", MODE_PRIVATE)
+                val sp1: SharedPreferences =
+                    context.getSharedPreferences("HceNdefMessage", MODE_PRIVATE)
+                sp1.edit().putString("content", ndefMessage).apply()
+                Log.i("SharedPreferences", "Wrote a message to HceNdefMessage.")
+                /*val fileout: FileOutputStream = context.openFileOutput("NdefMessage.txt", MODE_PRIVATE)
                 val outputWriter = OutputStreamWriter(fileout)
                 outputWriter.write(ndefMessage)
                 outputWriter.close()
 
-                Log.i("writeNdefMessageToFile()", "Wrote a message to NdefMessage.txt.")
+                Log.i("writeNdefMessageToFile()", "Wrote a message to NdefMessage.txt.")*/
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -393,8 +457,12 @@ class KHostApduService : HostApduService() {
         @JvmStatic
         fun deleteNdefMessageFile(context: Context) {
             try {
-                context.deleteFile("NdefMessage.txt")
-                Log.i("deleteNdefMessageFile()", "The NdefMessage.txt has been deleted.")
+                val sp1: SharedPreferences =
+                    context.getSharedPreferences("HceNdefMessage", MODE_PRIVATE)
+                sp1.edit().clear().apply()
+                Log.i("SharedPreferences", "The NdefMessage has been cleared.")
+                /*context.deleteFile("NdefMessage.txt")
+                Log.i("deleteNdefMessageFile()", "The NdefMessage.txt has been deleted.")*/
             } catch (e: Exception) {
                 e.printStackTrace()
             }
