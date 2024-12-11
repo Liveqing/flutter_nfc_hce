@@ -6,9 +6,11 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.nfc.NfcAdapter
 import android.nfc.cardemulation.CardEmulation
+import android.nfc.cardemulation.HostApduService.MODE_PRIVATE
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -112,8 +114,18 @@ class FlutterNfcHcePlugin: FlutterPlugin, MethodCallHandler, ActivityAware  {
         }
     }
     private fun stopNfcHce() {
+        //Log.i("stopNfcHce", "---------------------->stopNfcHce")
+        removeHceNdefSp()
         val intent = Intent(activity, KHostApduService::class.java)
         activity?.stopService(intent)
+    }
+
+    private fun removeHceNdefSp(){
+        val sp1: SharedPreferences? =
+            activity?.getSharedPreferences("HceNdefMessage", MODE_PRIVATE)
+        //Log.i("SharedPreferences", "content=" + sp1?.getString("content", ""))
+        sp1?.edit()?.remove("content")?.apply()
+        Log.i("SharedPreferences", "The NdefMessage has been cleared.")
     }
 
     private fun isNfcHceSupported() =

@@ -123,13 +123,14 @@ class KHostApduService : HostApduService() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.i("onCreate()", "-> ndefMessage initial value: $NDEF_MESSAGE")
+        Log.i("onCreate()", "-> ndefMessage initial value")
+        //Log.i("onCreate()", "-> ndefMessage initial value: $NDEF_MESSAGE")
         loadSpData()
     }
 
     private fun loadSpData(){
         val content = readNdefMessageFromFile(this)
-        Log.i("loadSpData()", "-> content: $content")
+        //Log.i("loadSpData()", "-> content: $content")
         if (!content.isNullOrEmpty()) {
             NDEF_URI = NdefMessage(createUriRecord(content, NDEF_ID))
             NDEF_URI?.let {
@@ -162,8 +163,12 @@ class KHostApduService : HostApduService() {
             if (persistMessage) {
                 Log.i(
                     "onStartCommand()",
-                    "persistMessage == true -> writeNdefMessageToFile call, content: $content"
+                    "persistMessage == true -> writeNdefMessageToFile call, content"
                 )
+                /*Log.i(
+                    "onStartCommand()",
+                    "persistMessage == true -> writeNdefMessageToFile call, content: $content"
+                )*/
                 writeNdefMessageToFile(this, content)
             }
 
@@ -177,7 +182,8 @@ class KHostApduService : HostApduService() {
             }
         }
 
-        Log.i(TAG, "onStartCommand() | NDEF$NDEF_URI")
+        Log.i(TAG, "onStartCommand() | NDEF")
+        //Log.i(TAG, "onStartCommand() | NDEF$NDEF_URI")
 
 //        return Service.START_STICKY
         return Service.START_REDELIVER_INTENT
@@ -213,8 +219,12 @@ class KHostApduService : HostApduService() {
         ) {
             Log.i(
                 TAG,
-                "READ_CAPABILITY_CONTAINER triggered. Our Response: " + READ_CAPABILITY_CONTAINER_RESPONSE.toHex(),
+                "READ_CAPABILITY_CONTAINER triggered. Our Response",
             )
+            /*Log.i(
+                TAG,
+                "READ_CAPABILITY_CONTAINER triggered. Our Response: " + READ_CAPABILITY_CONTAINER_RESPONSE.toHex(),
+            )*/
             READ_CAPABILITY_CONTAINER_CHECK = true
             return READ_CAPABILITY_CONTAINER_RESPONSE
         }
@@ -239,7 +249,8 @@ class KHostApduService : HostApduService() {
             System.arraycopy(NDEF_URI_LEN, 0, response, 0, NDEF_URI_LEN.size)
             System.arraycopy(A_OKAY, 0, response, NDEF_URI_LEN.size, A_OKAY.size)
 
-            Log.i(TAG, "NDEF_READ_BINARY_NLEN triggered. Our Response: " + response.toHex())
+            Log.i(TAG, "NDEF_READ_BINARY_NLEN triggered. Our Response")
+            //Log.i(TAG, "NDEF_READ_BINARY_NLEN triggered. Our Response: " + response.toHex())
 
             READ_CAPABILITY_CONTAINER_CHECK = false
             return response
@@ -286,7 +297,7 @@ class KHostApduService : HostApduService() {
         //
         // We're doing something outside our scope
         //
-        Log.wtf(TAG, "processCommandApdu() | I don't know what's going on!!!")
+        Log.wtf(TAG, "processCommandApdu() | error")
         return A_ERROR
     }
 
@@ -327,7 +338,8 @@ class KHostApduService : HostApduService() {
     //2023.09.15
     //Create a method with an additional 'mimeType' parameter.
     private fun createNdefRecord(content: String, mimeType: String, id: ByteArray): NdefRecord {
-        Log.i(TAG, "createNdefRecord(): $content")
+        Log.i(TAG, "createNdefRecord()")
+        //Log.i(TAG, "createNdefRecord(): $content")
 
         if (mimeType == "text/plain") {
             return createTextRecord("en", content, id);
@@ -415,7 +427,8 @@ class KHostApduService : HostApduService() {
                 val sp1: SharedPreferences =
                     context.getSharedPreferences("HceNdefMessage", MODE_PRIVATE)
                 ndefMessage = sp1.getString("content", "")
-                Log.i("SharedPreferences", "Read a message '$ndefMessage' from NdefMessage")
+                Log.i("SharedPreferences", "Read a message from NdefMessage")
+                //Log.i("SharedPreferences", "Read a message '$ndefMessage' from NdefMessage")
                 /*val fileIn: FileInputStream = context.openFileInput("NdefMessage.txt")
                 val InputRead = InputStreamReader(fileIn)
                 val inputBuffer = CharArray(READ_BLOCK_SIZE)
@@ -459,7 +472,7 @@ class KHostApduService : HostApduService() {
             try {
                 val sp1: SharedPreferences =
                     context.getSharedPreferences("HceNdefMessage", MODE_PRIVATE)
-                sp1.edit().clear().apply()
+                sp1.edit().remove("content").apply()
                 Log.i("SharedPreferences", "The NdefMessage has been cleared.")
                 /*context.deleteFile("NdefMessage.txt")
                 Log.i("deleteNdefMessageFile()", "The NdefMessage.txt has been deleted.")*/
